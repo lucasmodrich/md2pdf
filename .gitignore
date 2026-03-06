@@ -1,6 +1,7 @@
 # Generated PDF output
 pdf_output/
 output/
+input/
 
 # Intermediate Typst files (left behind on conversion failure)
 *.typ
