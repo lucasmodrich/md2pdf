@@ -20,15 +20,15 @@
     If specified, downloads and installs Typst if not already installed.
 
 .EXAMPLE
-    .\convert-md-to-pdf-typst.ps1 -InputPath "README.md"
+    .\md2pdf.ps1 -InputPath "README.md"
     Convert a single markdown file to PDF.
 
 .EXAMPLE
-    .\convert-md-to-pdf-typst.ps1 -InputPath "./docs" -Recursive
+    .\md2pdf.ps1 -InputPath "./docs" -Recursive
     Convert all markdown files in the docs directory and subdirectories.
 
 .EXAMPLE
-    .\convert-md-to-pdf-typst.ps1 -InstallTypst
+    .\md2pdf.ps1 -InstallTypst
     Install Typst before converting documents.
 #>
 
@@ -67,10 +67,11 @@ function Install-Typst {
     Write-Host "Installing Typst..." -ForegroundColor Cyan
     
     $typstVersion = "v0.12.0"
-    $platform = if ($IsWindows -or $env:OS -match "Windows") { "x86_64-pc-windows-msvc" } 
-                elseif ($IsMacOS) { "x86_64-apple-darwin" }
-                elseif ($IsLinux) { "x86_64-unknown-linux-musl" }
-                else { "x86_64-pc-windows-msvc" }
+    $arch = if ([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) { "aarch64" } else { "x86_64" }
+    $platform = if ($IsWindows -or $env:OS -match "Windows") { "$arch-pc-windows-msvc" }
+                elseif ($IsMacOS) { "$arch-apple-darwin" }
+                elseif ($IsLinux) { "$arch-unknown-linux-musl" }
+                else { "$arch-pc-windows-msvc" }
     
     $downloadUrl = "https://github.com/typst/typst/releases/download/$typstVersion/typst-$platform.zip"
     $tempZip = Join-Path $env:TEMP "typst.zip"
@@ -120,14 +121,19 @@ function Convert-MarkdownToPdf {
     Write-Host "Converting: $MarkdownFile" -ForegroundColor Cyan
     
     # Build pandoc command - generate Typst first, then compile
-    $typstFile = [System.IO.Path]::ChangeExtension($OutputFile, ".typ")
+    # Place the .typ file next to the source markdown so Typst resolves relative
+    # paths (images, includes) against the correct directory.
+    $typstBaseName = [System.IO.Path]::GetFileNameWithoutExtension($OutputFile)
+    $sourceDir = Split-Path $MarkdownFile -Parent
+    $typstFile = Join-Path $sourceDir "._md2pdf_$typstBaseName.typ"
     
     try {
-        # Step 1: Convert markdown to Typst
-        & pandoc $MarkdownFile -o $typstFile -t typst 2>&1 | Out-Null
+        # Step 1: Convert markdown to Typst (--standalone preserves YAML front matter)
+        $pandocOutput = & pandoc $MarkdownFile -o $typstFile -t typst --standalone 2>&1
         
         if ($LASTEXITCODE -ne 0) {
             Write-Host "✗ Failed to convert markdown to Typst: $MarkdownFile" -ForegroundColor Red
+            if ($pandocOutput) { Write-Host ($pandocOutput -join "`n") -ForegroundColor Red }
             return $false
         }
         
@@ -136,7 +142,7 @@ function Convert-MarkdownToPdf {
         $styledTypst = @"
 // GitHub-style formatting
 #set page(margin: (x: 2.5cm, y: 2.5cm))
-#set text(font: "Segoe UI", size: 11pt, fill: rgb("#24292e"))
+#set text(font: ("Segoe UI", "Arial", "Helvetica", "DejaVu Sans"), size: 11pt, fill: rgb("#24292e"))
 #set par(justify: false, leading: 0.65em)
 
 #show heading.where(level: 1): it => {
@@ -163,14 +169,14 @@ function Convert-MarkdownToPdf {
   fill: rgb("#f6f8fa"),
   outset: (x: 3pt, y: 2pt),
   radius: 3pt,
-)[#set text(font: "Consolas", size: 0.85em); #it]
+)[#set text(font: ("Consolas", "Menlo", "DejaVu Sans Mono", "Courier New"), size: 0.85em); #it]
 
 #show raw.where(block: true): it => block(
   fill: rgb("#f6f8fa"),
   width: 100%,
   inset: 1em,
   radius: 6pt,
-)[#set text(font: "Consolas", size: 0.85em); #it]
+)[#set text(font: ("Consolas", "Menlo", "DejaVu Sans Mono", "Courier New"), size: 0.85em); #it]
 
 #show quote: it => pad(
   left: 1em,
@@ -181,19 +187,13 @@ function Convert-MarkdownToPdf {
   )[#set text(fill: rgb("#6a737d")); #it]
 )
 
-#let horizontalrule = [
-  #v(0.5em)
-  #line(length: 100%, stroke: 0.25em + rgb("#e1e4e8"))
-  #v(0.5em)
-]
-
 $typstContent
 "@
         
         Set-Content -Path $typstFile -Value $styledTypst -Encoding UTF8
         
         # Step 3: Compile Typst to PDF
-        & typst compile $typstFile $OutputFile 2>&1 | Out-Null
+        $typstOutput = & typst compile $typstFile $OutputFile 2>&1
         
         if ($LASTEXITCODE -eq 0) {
             # Clean up intermediate Typst file
@@ -203,6 +203,7 @@ $typstContent
         }
         else {
             Write-Host "✗ Failed to compile Typst to PDF: $MarkdownFile" -ForegroundColor Red
+            if ($typstOutput) { Write-Host ($typstOutput -join "`n") -ForegroundColor Red }
             Write-Host "  Typst file saved at: $typstFile (for debugging)" -ForegroundColor Yellow
             return $false
         }
@@ -223,15 +224,16 @@ if ($InstallTypst) {
     if (Install-Typst) {
         Write-Host ""
         Write-Host "Typst has been installed. Please restart your terminal and run the script again." -ForegroundColor Yellow
+        exit 0
     }
-    exit 0
+    exit 1
 }
 
 # Validate that InputPath is provided
 if (-not $InputPath) {
     Write-Host "ERROR: InputPath parameter is required" -ForegroundColor Red
     Write-Host ""
-    Write-Host "Usage: .\convert-md-to-pdf-typst.ps1 -InputPath <path>" -ForegroundColor Yellow
+    Write-Host "Usage: .\md2pdf.ps1 -InputPath <path>" -ForegroundColor Yellow
     Write-Host "Use -InstallTypst flag to install Typst first" -ForegroundColor Yellow
     exit 1
 }
@@ -243,21 +245,29 @@ if (-not (Test-CommandExists "pandoc")) {
     exit 1
 }
 
+# Check minimum pandoc version (3.2 introduced -t typst)
+$pandocVersionRaw = (pandoc --version | Select-Object -First 1) -replace "pandoc ", ""
+$pandocVersionParsed = [version]($pandocVersionRaw -replace "-.*", "")
+if ($pandocVersionParsed -lt [version]"3.2") {
+    Write-Host "ERROR: pandoc $pandocVersionRaw is too old. Version 3.2 or higher is required for Typst output." -ForegroundColor Red
+    Write-Host "Please upgrade pandoc from: https://pandoc.org/installing.html" -ForegroundColor Yellow
+    exit 1
+}
+
 # Check if Typst is installed
 if (-not (Test-CommandExists "typst")) {
     Write-Host "ERROR: Typst is not installed or not in PATH" -ForegroundColor Red
     Write-Host ""
     Write-Host "To install Typst, run:" -ForegroundColor Yellow
-    Write-Host "  .\convert-md-to-pdf-typst.ps1 -InstallTypst" -ForegroundColor Cyan
+    Write-Host "  .\md2pdf.ps1 -InstallTypst" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Or install manually from: https://github.com/typst/typst/releases" -ForegroundColor Yellow
     exit 1
 }
 
 # Show versions
-$pandocVersion = (pandoc --version | Select-Object -First 1) -replace "pandoc ", ""
-$typstVersion = (typst --version) -replace "typst ", ""
-Write-Host "Using pandoc $pandocVersion with Typst $typstVersion" -ForegroundColor Cyan
+$typstVersionFull = (typst --version) -replace "typst ", "" -replace " \(.*\)", ""
+Write-Host "Using pandoc $pandocVersionRaw with Typst $typstVersionFull" -ForegroundColor Cyan
 Write-Host ""
 
 # Create output directory if it doesn't exist
