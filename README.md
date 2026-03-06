@@ -16,10 +16,12 @@ Convert Markdown files to beautifully formatted PDFs with GitHub-style styling u
 
 ## Features
 
-- **Cross-platform**: Works on Windows (PowerShell), Linux, and macOS (Bash)
+- **Cross-platform**: Works on Windows (PowerShell), Linux, and macOS (Bash), including ARM64
 - **Batch conversion**: Process entire directories of Markdown files
 - **Recursive processing**: Scan subdirectories for Markdown files
 - **GitHub styling**: Professional, GitHub-themed PDF output
+- **Front matter**: YAML front matter (`title`, `author`, `date`) is rendered in the output
+- **Relative assets**: Images and includes are resolved relative to the source file
 - **Auto-install**: Built-in Typst installation functionality
 - **Flexible output**: Specify custom output directories
 
@@ -27,9 +29,10 @@ Convert Markdown files to beautifully formatted PDFs with GitHub-style styling u
 
 ### Required
 
-1. **Pandoc** (v2.0 or higher)
+1. **Pandoc** (v3.2 or higher)
    - Universal document converter
    - Required for Markdown to Typst conversion
+   - v3.2+ is required for Typst output format support
 
 2. **Typst** (v0.12.0 recommended)
    - Modern typesetting engine
@@ -214,12 +217,13 @@ chmod +x md2pdf.sh
 
 The scripts generate PDFs with GitHub-style formatting:
 
-- **Typography**: Clean, readable fonts (Segoe UI/Liberation Sans)
+- **Typography**: Cross-platform font priority list — `Segoe UI` / `Arial` / `Helvetica` / `DejaVu Sans`
+- **Monospace**: `Consolas` / `Menlo` / `DejaVu Sans Mono` / `Courier New`
 - **Headings**: Bold with horizontal rules for H1 and H2
-- **Code blocks**: Syntax highlighting with gray background
+- **Code blocks**: Monospace font with light grey background
 - **Inline code**: Monospace font with light background
 - **Links**: Blue, GitHub-style hyperlinks
-- **Quotes**: Left border with gray text
+- **Quotes**: Left border with grey text
 - **Page margins**: 2.5cm on all sides
 
 ## Examples
@@ -264,16 +268,26 @@ pdf_output/
 - Restart your terminal after installation
 
 ### Conversion fails with font errors
-The scripts use system fonts:
-- **Windows**: Segoe UI, Consolas
-- **Linux/macOS**: Liberation Sans, Liberation Mono
+The scripts use a cross-platform font priority list. Typst picks the first font it finds installed on the system:
 
-If fonts are missing, install them or modify the font settings in the script's Typst template.
+- **Body text**: Segoe UI → Arial → Helvetica → DejaVu Sans
+- **Monospace**: Consolas → Menlo → DejaVu Sans Mono → Courier New
+
+At least one font from each list is present on all mainstream operating systems. Font warnings in the output are non-fatal — Typst substitutes the next available font automatically.
 
 ### Permission denied (Linux/macOS)
 ```bash
 chmod +x md2pdf.sh
 ```
+
+### Images not appearing in the PDF
+Image paths must be relative to the source `.md` file. The scripts write the intermediate Typst file alongside the source markdown so all relative paths resolve correctly:
+
+```markdown
+![Logo](images/logo.png)
+```
+
+The above works as long as `images/logo.png` exists next to the Markdown file.
 
 ### PowerShell execution policy error (Windows)
 ```powershell
@@ -287,8 +301,7 @@ md2pdf/
 ├── md2pdf.ps1          # PowerShell script for Windows
 ├── md2pdf.sh           # Bash script for Linux/macOS
 ├── README.md           # This file
-├── LICENSE             # Project license
-├── docs/               # Documentation directory
+├── LICENSE             # Project licence
 └── pdf_output/         # Default output directory (created automatically)
 ```
 
