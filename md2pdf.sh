@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Markdown to PDF Converter with Typst Engine
-# Usage: ./convert-md-to-pdf-typst.sh <input_path> [output_dir]
+# Usage: ./md2pdf.sh <input_path> [output_dir]
 
 set -e
 
@@ -39,7 +39,11 @@ install_typst() {
     # Detect platform
     case "$(uname -s)" in
         Linux*)
-            platform="x86_64-unknown-linux-musl"
+            if [[ "$(uname -m)" == "aarch64" ]]; then
+                platform="aarch64-unknown-linux-musl"
+            else
+                platform="x86_64-unknown-linux-musl"
+            fi
             ;;
         Darwin*)
             if [[ "$(uname -m)" == "arm64" ]]; then
@@ -104,12 +108,19 @@ convert_md_to_pdf() {
     
     print_color "$CYAN" "Converting: $md_file"
     
-    # Create temporary Typst file
-    local typst_file="${output_file%.pdf}.typ"
+    # Place the .typ file next to the source markdown so Typst resolves relative
+    # paths (images, includes) against the correct directory.
+    local source_dir base_name typst_file
+    source_dir=$(dirname "$md_file")
+    base_name=$(basename "$output_file" .pdf)
+    typst_file="${source_dir}/._md2pdf_${base_name}.typ"
     
-    # Step 1: Convert markdown to Typst
-    if ! pandoc "$md_file" -o "$typst_file" -t typst 2>/dev/null; then
+    # Step 1: Convert markdown to Typst (--standalone preserves YAML front matter)
+    local pandoc_output
+    pandoc_output=$(pandoc "$md_file" -o "$typst_file" -t typst --standalone 2>&1)
+    if [[ $? -ne 0 ]]; then
         print_color "$RED" "✗ Failed to convert markdown to Typst: $md_file"
+        [[ -n "$pandoc_output" ]] && echo "$pandoc_output"
         return 1
     fi
     
@@ -118,7 +129,7 @@ convert_md_to_pdf() {
     cat > "$typst_file" << 'TYPST_TEMPLATE'
 // GitHub-style formatting
 #set page(margin: (x: 2.5cm, y: 2.5cm))
-#set text(font: "Liberation Sans", size: 11pt, fill: rgb("#24292e"))
+#set text(font: ("Segoe UI", "Arial", "Helvetica", "DejaVu Sans"), size: 11pt, fill: rgb("#24292e"))
 #set par(justify: false, leading: 0.65em)
 
 #show heading.where(level: 1): it => {
@@ -145,14 +156,14 @@ convert_md_to_pdf() {
   fill: rgb("#f6f8fa"),
   outset: (x: 3pt, y: 2pt),
   radius: 3pt,
-)[#set text(font: "Liberation Mono", size: 0.85em); #it]
+)[#set text(font: ("Consolas", "Menlo", "DejaVu Sans Mono", "Courier New"), size: 0.85em); #it]
 
 #show raw.where(block: true): it => block(
   fill: rgb("#f6f8fa"),
   width: 100%,
   inset: 1em,
   radius: 6pt,
-)[#set text(font: "Liberation Mono", size: 0.85em); #it]
+)[#set text(font: ("Consolas", "Menlo", "DejaVu Sans Mono", "Courier New"), size: 0.85em); #it]
 
 #show quote: it => pad(
   left: 1em,
@@ -163,23 +174,20 @@ convert_md_to_pdf() {
   )[#set text(fill: rgb("#6a737d")); #it]
 )
 
-#let horizontalrule = [
-  #v(0.5em)
-  #line(length: 100%, stroke: 0.25em + rgb("#e1e4e8"))
-  #v(0.5em)
-]
-
 TYPST_TEMPLATE
     
     echo "$typst_content" >> "$typst_file"
     
     # Step 3: Compile Typst to PDF
-    if typst compile "$typst_file" "$output_file" 2>/dev/null; then
+    local typst_output
+    typst_output=$(typst compile "$typst_file" "$output_file" 2>&1)
+    if [[ $? -eq 0 ]]; then
         rm -f "$typst_file"
         print_color "$GREEN" "✓ Created: $output_file"
         return 0
     else
         print_color "$RED" "✗ Failed to compile Typst to PDF: $md_file"
+        [[ -n "$typst_output" ]] && echo "$typst_output"
         print_color "$YELLOW" "  Typst file saved at: $typst_file (for debugging)"
         return 1
     fi
@@ -245,6 +253,18 @@ main() {
         print_color "$YELLOW" "Please install pandoc: https://pandoc.org/installing.html"
         exit 1
     fi
+
+    # Check minimum pandoc version (3.2 introduced -t typst)
+    local pandoc_version
+    pandoc_version=$(pandoc --version | head -n1 | cut -d' ' -f2)
+    local pandoc_major pandoc_minor
+    pandoc_major=$(echo "$pandoc_version" | cut -d'.' -f1)
+    pandoc_minor=$(echo "$pandoc_version" | cut -d'.' -f2)
+    if [[ $pandoc_major -lt 3 ]] || { [[ $pandoc_major -eq 3 ]] && [[ $pandoc_minor -lt 2 ]]; }; then
+        print_color "$RED" "ERROR: pandoc $pandoc_version is too old. Version 3.2 or higher is required for Typst output."
+        print_color "$YELLOW" "Please upgrade pandoc from: https://pandoc.org/installing.html"
+        exit 1
+    fi
     
     if ! command_exists typst; then
         print_color "$RED" "ERROR: Typst is not installed or not in PATH"
@@ -256,10 +276,10 @@ main() {
         exit 1
     fi
     
-    # Show versions
-    local pandoc_version=$(pandoc --version | head -n1 | cut -d' ' -f2)
-    local typst_version=$(typst --version | cut -d' ' -f2)
-    print_color "$CYAN" "Using pandoc $pandoc_version with Typst $typstversion"
+    # Show versions (pandoc_version already set above; strip commit hash from typst)
+    local typst_version
+    typst_version=$(typst --version | cut -d' ' -f2)
+    print_color "$CYAN" "Using pandoc $pandoc_version with Typst $typst_version"
     echo ""
     
     # Parse arguments
@@ -343,9 +363,9 @@ main() {
         local pdf_file="${OUTPUT_DIR}/${base_name}.pdf"
         
         if convert_md_to_pdf "$md_file" "$pdf_file"; then
-            ((success_count++))
+            success_count=$((success_count + 1))
         else
-            ((fail_count++))
+            fail_count=$((fail_count + 1))
         fi
     done
     
