@@ -195,7 +195,7 @@ chmod +x md2pdf.sh
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `-InputPath` | String | Yes* | - | Path to a Markdown file or directory |
-| `-OutputDir` | String | No | `./pdf_output` | Directory for PDF output |
+| `-OutputDir` | String | No | `./output` | Directory for PDF output |
 | `-Recursive` | Switch | No | `false` | Process subdirectories recursively |
 | `-InstallTypst` | Switch | No | `false` | Download and install Typst |
 
@@ -206,7 +206,7 @@ chmod +x md2pdf.sh
 | Option | Type | Required | Default | Description |
 |--------|------|----------|---------|-------------|
 | `<input_path>` | Positional | Yes* | - | Path to a Markdown file or directory |
-| `[output_dir]` | Positional | No | `./pdf_output` | Directory for PDF output |
+| `[output_dir]` | Positional | No | `./output` | Directory for PDF output |
 | `-r, --recursive` | Flag | No | `false` | Process subdirectories recursively |
 | `-i, --install` | Flag | No | `false` | Download and install Typst |
 | `-h, --help` | Flag | No | `false` | Show help message |
@@ -247,9 +247,9 @@ The scripts generate PDFs with GitHub-style formatting:
 ```
 
 ### Example 3: Batch convert with custom styling
-The scripts automatically apply GitHub styling. Output PDFs will be saved to `./pdf_output` by default:
+The scripts automatically apply GitHub styling. Output PDFs will be saved to `./output` by default:
 ```
-pdf_output/
+output/
 ├── README.pdf
 ├── CONTRIBUTING.pdf
 └── CHANGELOG.pdf
@@ -302,7 +302,8 @@ md2pdf/
 ├── md2pdf.sh           # Bash script for Linux/macOS
 ├── README.md           # This file
 ├── LICENSE             # Project licence
-└── pdf_output/         # Default output directory (created automatically)
+├── input/              # Place source Markdown files here
+└── output/             # Generated PDFs saved here by default
 ```
 
 ## Contributing

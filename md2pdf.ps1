@@ -11,7 +11,7 @@
     Path to a markdown file or directory containing markdown files.
 
 .PARAMETER OutputDir
-    Directory where PDF files will be saved. Defaults to './pdf_output'.
+    Directory where PDF files will be saved. Defaults to './output'.
 
 .PARAMETER Recursive
     If specified and InputPath is a directory, process markdown files in subdirectories.
@@ -38,7 +38,7 @@ param(
     [string]$InputPath,
     
     [Parameter(Mandatory=$false)]
-    [string]$OutputDir = "./pdf_output",
+    [string]$OutputDir = "./output",
     
     [Parameter(Mandatory=$false)]
     [switch]$Recursive,

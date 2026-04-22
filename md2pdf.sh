@@ -13,7 +13,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Default values
-OUTPUT_DIR="./pdf_output"
+OUTPUT_DIR="./output"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Function to print colored output
@@ -202,7 +202,7 @@ Usage: $0 <input_path> [output_dir] [options]
 
 Arguments:
     input_path      Path to a markdown file or directory containing markdown files
-    output_dir      Directory where PDF files will be saved (default: ./pdf_output)
+    output_dir      Directory where PDF files will be saved (default: ./output)
 
 Options:
     -r, --recursive Process subdirectories recursively
@@ -295,7 +295,7 @@ main() {
             *)
                 if [[ -z "$input_path" ]]; then
                     input_path=$1
-                elif [[ "$OUTPUT_DIR" == "./pdf_output" ]]; then
+                elif [[ "$OUTPUT_DIR" == "./output" ]]; then
                     OUTPUT_DIR=$1
                 fi
                 shift
