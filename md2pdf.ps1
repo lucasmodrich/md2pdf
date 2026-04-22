@@ -11,7 +11,7 @@
 .PARAMETER InputPath
     Path to a markdown file or directory containing markdown files.
 
-.PARAMETER OutputDir
+.PARAMETER OutputPath
     Directory where output files will be saved. Defaults to './output'.
 
 .PARAMETER Format
@@ -36,6 +36,10 @@
     Convert all markdown files in the docs directory and subdirectories to PDF.
 
 .EXAMPLE
+    .\md2pdf.ps1 -InputPath "./docs" -OutputPath "./output" -Recursive
+    Convert all markdown files to PDF with an explicit output directory.
+
+.EXAMPLE
     .\md2pdf.ps1 -InputPath "./docs" -Format docx -Recursive
     Convert all markdown files in the docs directory and subdirectories to DOCX.
 
@@ -50,7 +54,7 @@ param(
     [string]$InputPath,
 
     [Parameter(Mandatory=$false)]
-    [string]$OutputDir = "./output",
+    [string]$OutputPath = "./output",
 
     [Parameter(Mandatory=$false)]
     [ValidateSet('pdf', 'docx')]
@@ -269,7 +273,7 @@ if ($InstallTypst) {
 if (-not $InputPath) {
     Write-Host "ERROR: InputPath parameter is required" -ForegroundColor Red
     Write-Host ""
-    Write-Host "Usage: .\md2pdf.ps1 -InputPath <path> [-Format pdf|docx]" -ForegroundColor Yellow
+    Write-Host "Usage: .\md2pdf.ps1 -InputPath <path> [-OutputPath <dir>] [-Format pdf|docx]" -ForegroundColor Yellow
     Write-Host "Use -InstallTypst flag to install Typst first (required for PDF output)" -ForegroundColor Yellow
     exit 1
 }
@@ -311,9 +315,9 @@ else {
 Write-Host ""
 
 # Create output directory if it doesn't exist
-if (-not (Test-Path $OutputDir)) {
-    New-Item -ItemType Directory -Path $OutputDir | Out-Null
-    Write-Host "Created output directory: $OutputDir" -ForegroundColor Green
+if (-not (Test-Path $OutputPath)) {
+    New-Item -ItemType Directory -Path $OutputPath | Out-Null
+    Write-Host "Created output directory: $OutputPath" -ForegroundColor Green
 }
 
 # Get markdown files to process
@@ -357,9 +361,9 @@ $failCount = 0
 
 foreach ($mdFile in $markdownFiles) {
     $outputFileName = [System.IO.Path]::GetFileNameWithoutExtension($mdFile.Name) + ".$Format"
-    $outputPath = Join-Path $OutputDir $outputFileName
+    $outputFilePath = Join-Path $OutputPath $outputFileName
 
-    if (Convert-MarkdownFile -MarkdownFile $mdFile.FullName -OutputFile $outputPath -OutputFormat $Format) {
+    if (Convert-MarkdownFile -MarkdownFile $mdFile.FullName -OutputFile $outputFilePath -OutputFormat $Format) {
         $successCount++
     }
     else {
@@ -372,4 +376,4 @@ Write-Host ""
 Write-Host "=== Conversion Complete ===" -ForegroundColor Yellow
 Write-Host "Successful: $successCount" -ForegroundColor Green
 Write-Host "Failed: $failCount" -ForegroundColor $(if ($failCount -gt 0) { "Red" } else { "Gray" })
-Write-Host "Output directory: $OutputDir" -ForegroundColor Cyan
+Write-Host "Output directory: $OutputPath" -ForegroundColor Cyan

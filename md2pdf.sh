@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Markdown to PDF/DOCX Converter
-# Usage: ./md2pdf.sh <input_path> [output_dir] [--format pdf|docx]
+# Usage: ./md2pdf.sh <input_path> [--output-path <dir>] [--format pdf|docx]
 
 set -e
 
@@ -214,23 +214,23 @@ show_usage() {
     cat << EOF
 Markdown to PDF/DOCX Converter
 
-Usage: $0 <input_path> [output_dir] [options]
+Usage: $0 <input_path> [options]
 
 Arguments:
-    input_path      Path to a markdown file or directory containing markdown files
-    output_dir      Directory where output files will be saved (default: ./output)
+    input_path          Path to a markdown file or directory containing markdown files
 
 Options:
-    -f, --format    Output format: pdf (default) or docx
-    -r, --recursive Process subdirectories recursively
-    -i, --install   Install Typst before converting (PDF only)
-    -h, --help      Show this help message
+    -o, --output-path   Directory where output files will be saved (default: ./output)
+    -f, --format        Output format: pdf (default) or docx
+    -r, --recursive     Process subdirectories recursively
+    -i, --install       Install Typst before converting (PDF only)
+    -h, --help          Show this help message
 
 Examples:
     $0 README.md
     $0 README.md --format docx
-    $0 ./docs ./output
-    $0 ./docs ./output --format docx --recursive
+    $0 ./docs --output-path ./output
+    $0 ./docs --output-path ./output --format docx --recursive
     $0 -r ./docs
     $0 --install
 
@@ -277,11 +277,16 @@ main() {
                 FORMAT=$2
                 shift 2
                 ;;
+            -o|--output-path)
+                OUTPUT_DIR=$2
+                shift 2
+                ;;
             *)
                 if [[ -z "$input_path" ]]; then
                     input_path=$1
-                elif [[ "$OUTPUT_DIR" == "./output" ]]; then
-                    OUTPUT_DIR=$1
+                else
+                    print_color "$RED" "ERROR: Unexpected argument '$1'. Use --output-path to set the output directory."
+                    exit 1
                 fi
                 shift
                 ;;

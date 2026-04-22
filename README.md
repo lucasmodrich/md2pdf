@@ -159,7 +159,7 @@ cd md2pdf
 
 #### Convert recursively with custom output directory
 ```powershell
-.\md2pdf.ps1 -InputPath "./docs" -OutputDir "./output" -Recursive
+.\md2pdf.ps1 -InputPath "./docs" -OutputPath "./output" -Recursive
 ```
 
 #### Convert recursively to DOCX
@@ -196,12 +196,12 @@ chmod +x md2pdf.sh
 
 #### Convert recursively with custom output directory
 ```bash
-./md2pdf.sh ./docs ./output --recursive
+./md2pdf.sh ./docs --output-path ./output --recursive
 ```
 
 #### Convert recursively to DOCX
 ```bash
-./md2pdf.sh ./docs ./output --format docx --recursive
+./md2pdf.sh ./docs --output-path ./output --format docx --recursive
 ```
 
 #### Install Typst (required for PDF output)
@@ -221,7 +221,7 @@ chmod +x md2pdf.sh
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `-InputPath` | String | Yes* | - | Path to a Markdown file or directory |
-| `-OutputDir` | String | No | `./output` | Directory for output files |
+| `-OutputPath` | String | No | `./output` | Directory for output files |
 | `-Format` | String | No | `pdf` | Output format: `pdf` or `docx` |
 | `-Recursive` | Switch | No | `false` | Process subdirectories recursively |
 | `-InstallTypst` | Switch | No | `false` | Download and install Typst |
@@ -233,7 +233,7 @@ chmod +x md2pdf.sh
 | Option | Type | Required | Default | Description |
 |--------|------|----------|---------|-------------|
 | `<input_path>` | Positional | Yes* | - | Path to a Markdown file or directory |
-| `[output_dir]` | Positional | No | `./output` | Directory for output files |
+| `-o, --output-path` | Flag | No | `./output` | Directory for output files |
 | `-f, --format` | Flag | No | `pdf` | Output format: `pdf` or `docx` |
 | `-r, --recursive` | Flag | No | `false` | Process subdirectories recursively |
 | `-i, --install` | Flag | No | `false` | Download and install Typst |
@@ -268,7 +268,7 @@ DOCX files are produced directly by Pandoc using its default Word styles. The ou
 .\md2pdf.ps1 -InputPath "./docs" -Recursive
 
 # Linux/macOS
-./md2pdf.sh -r ./docs
+./md2pdf.sh ./docs -r
 ```
 
 ### Example 2: Convert documentation directory to DOCX
@@ -283,10 +283,10 @@ DOCX files are produced directly by Pandoc using its default Word styles. The ou
 ### Example 3: Convert to specific output location
 ```powershell
 # Windows
-.\md2pdf.ps1 -InputPath "project-notes.md" -OutputDir "C:\exports"
+.\md2pdf.ps1 -InputPath "project-notes.md" -OutputPath "C:\exports"
 
 # Linux/macOS
-./md2pdf.sh project-notes.md ~/exports
+./md2pdf.sh project-notes.md --output-path ~/exports
 ```
 
 ### Example 4: Batch convert — output layout

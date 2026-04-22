@@ -12,13 +12,13 @@ Shell-script converter that turns Markdown files into PDF or DOCX. No build syst
 # Bash (Linux/macOS or Git Bash on Windows)
 ./md2pdf.sh README.md                              # single file → PDF
 ./md2pdf.sh README.md --format docx               # single file → DOCX
-./md2pdf.sh ./input ./output --recursive           # directory, recursive
-./md2pdf.sh --install                              # auto-install Typst
+./md2pdf.sh ./input --output-path ./output --recursive   # directory, recursive
+./md2pdf.sh --install                                    # auto-install Typst
 
 # PowerShell (Windows)
 .\md2pdf.ps1 -InputPath README.md
 .\md2pdf.ps1 -InputPath README.md -Format docx
-.\md2pdf.ps1 -InputPath ./input -OutputDir ./output -Recursive
+.\md2pdf.ps1 -InputPath ./input -OutputPath ./output -Recursive
 .\md2pdf.ps1 -InstallTypst
 ```
 
