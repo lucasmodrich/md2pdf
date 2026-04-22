@@ -1,7 +1,16 @@
-# Generated PDF output
-pdf_output/
-output/
-input/
+# Ignore folder contents but preserve the folder via .gitkeep
+output/*
+input/*
+!output/.gitkeep
+!input/.gitkeep
 
 # Intermediate Typst files (left behind on conversion failure)
-*.typ
+._md2pdf_*.typ
+
+# Git worktrees
+.worktrees/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
