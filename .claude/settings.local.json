@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash -n /c/Users/ModrichLS/Dev/md2pdf/md2pdf.sh)",
+      "Bash(pwsh -NonInteractive -Command '& { $null = [System.Management.Automation.Language.Parser]::ParseFile\\('\\\\''/c/Users/ModrichLS/Dev/md2pdf/md2pdf.ps1'\\\\'', [ref]$null, [ref]$null\\); Write-Host '\\\\''PowerShell syntax OK'\\\\'' }')"
+    ]
+  }
+}

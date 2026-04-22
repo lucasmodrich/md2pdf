@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Markdown to PDF Converter with Typst Engine
-# Usage: ./md2pdf.sh <input_path> [output_dir]
+# Markdown to PDF/DOCX Converter
+# Usage: ./md2pdf.sh <input_path> [output_dir] [--format pdf|docx]
 
 set -e
 
@@ -14,6 +14,7 @@ NC='\033[0m' # No Color
 
 # Default values
 OUTPUT_DIR="./output"
+FORMAT="pdf"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Function to print colored output
@@ -101,20 +102,35 @@ install_typst() {
     return 0
 }
 
-# Function to convert markdown to PDF using Typst
-convert_md_to_pdf() {
+# Function to convert a markdown file to PDF (via Typst) or DOCX (via Pandoc directly)
+convert_file() {
     local md_file=$1
     local output_file=$2
-    
+    local format=$3
+
     print_color "$CYAN" "Converting: $md_file"
-    
+
+    if [[ "$format" == "docx" ]]; then
+        local pandoc_output
+        pandoc_output=$(pandoc "$md_file" -o "$output_file" 2>&1)
+        if [[ $? -eq 0 ]]; then
+            print_color "$GREEN" "✓ Created: $output_file"
+            return 0
+        else
+            print_color "$RED" "✗ Failed to convert: $md_file"
+            [[ -n "$pandoc_output" ]] && echo "$pandoc_output"
+            return 1
+        fi
+    fi
+
+    # PDF path: Markdown → Typst (with GitHub styling) → PDF
     # Place the .typ file next to the source markdown so Typst resolves relative
     # paths (images, includes) against the correct directory.
     local source_dir base_name typst_file
     source_dir=$(dirname "$md_file")
     base_name=$(basename "$output_file" .pdf)
     typst_file="${source_dir}/._md2pdf_${base_name}.typ"
-    
+
     # Step 1: Convert markdown to Typst (--standalone preserves YAML front matter)
     local pandoc_output
     pandoc_output=$(pandoc "$md_file" -o "$typst_file" -t typst --standalone 2>&1)
@@ -123,7 +139,7 @@ convert_md_to_pdf() {
         [[ -n "$pandoc_output" ]] && echo "$pandoc_output"
         return 1
     fi
-    
+
     # Step 2: Add GitHub styling to the Typst file
     local typst_content=$(cat "$typst_file")
     cat > "$typst_file" << 'TYPST_TEMPLATE'
@@ -175,9 +191,9 @@ convert_md_to_pdf() {
 )
 
 TYPST_TEMPLATE
-    
+
     echo "$typst_content" >> "$typst_file"
-    
+
     # Step 3: Compile Typst to PDF
     local typst_output
     typst_output=$(typst compile "$typst_file" "$output_file" 2>&1)
@@ -196,45 +212,45 @@ TYPST_TEMPLATE
 # Show usage
 show_usage() {
     cat << EOF
-Markdown to PDF Converter with Typst Engine
+Markdown to PDF/DOCX Converter
 
 Usage: $0 <input_path> [output_dir] [options]
 
 Arguments:
     input_path      Path to a markdown file or directory containing markdown files
-    output_dir      Directory where PDF files will be saved (default: ./output)
+    output_dir      Directory where output files will be saved (default: ./output)
 
 Options:
+    -f, --format    Output format: pdf (default) or docx
     -r, --recursive Process subdirectories recursively
-    -i, --install   Install Typst before converting
+    -i, --install   Install Typst before converting (PDF only)
     -h, --help      Show this help message
 
 Examples:
     $0 README.md
+    $0 README.md --format docx
     $0 ./docs ./output
+    $0 ./docs ./output --format docx --recursive
     $0 -r ./docs
     $0 --install
 
-Why Typst?
-    - Native Unicode and emoji support (✓ ✗ 😀 🎉)
-    - Modern typography and layout
-    - Fast compilation
-    - No external dependencies
-    - Active development
+Notes:
+    PDF output requires both Pandoc (v3.2+) and Typst.
+    DOCX output requires only Pandoc.
 EOF
     exit 0
 }
 
 # Main script
 main() {
-    print_color "$YELLOW" "=== Markdown to PDF Converter (Typst Engine) ==="
+    print_color "$YELLOW" "=== Markdown Converter ==="
     echo ""
-    
+
     # Check for help flag
     if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
         show_usage
     fi
-    
+
     # Check for install flag
     if [[ "$1" == "-i" ]] || [[ "$1" == "--install" ]]; then
         if install_typst; then
@@ -246,51 +262,20 @@ main() {
         fi
         exit 0
     fi
-    
-    # Check dependencies
-    if ! command_exists pandoc; then
-        print_color "$RED" "ERROR: pandoc is not installed or not in PATH"
-        print_color "$YELLOW" "Please install pandoc: https://pandoc.org/installing.html"
-        exit 1
-    fi
 
-    # Check minimum pandoc version (3.2 introduced -t typst)
-    local pandoc_version
-    pandoc_version=$(pandoc --version | head -n1 | cut -d' ' -f2)
-    local pandoc_major pandoc_minor
-    pandoc_major=$(echo "$pandoc_version" | cut -d'.' -f1)
-    pandoc_minor=$(echo "$pandoc_version" | cut -d'.' -f2)
-    if [[ $pandoc_major -lt 3 ]] || { [[ $pandoc_major -eq 3 ]] && [[ $pandoc_minor -lt 2 ]]; }; then
-        print_color "$RED" "ERROR: pandoc $pandoc_version is too old. Version 3.2 or higher is required for Typst output."
-        print_color "$YELLOW" "Please upgrade pandoc from: https://pandoc.org/installing.html"
-        exit 1
-    fi
-    
-    if ! command_exists typst; then
-        print_color "$RED" "ERROR: Typst is not installed or not in PATH"
-        echo ""
-        print_color "$YELLOW" "To install Typst, run:"
-        print_color "$CYAN" "  $0 --install"
-        echo ""
-        print_color "$YELLOW" "Or install manually from: https://github.com/typst/typst/releases"
-        exit 1
-    fi
-    
-    # Show versions (pandoc_version already set above; strip commit hash from typst)
-    local typst_version
-    typst_version=$(typst --version | cut -d' ' -f2)
-    print_color "$CYAN" "Using pandoc $pandoc_version with Typst $typst_version"
-    echo ""
-    
     # Parse arguments
     local recursive=0
     local input_path=""
-    
+
     while [[ $# -gt 0 ]]; do
         case $1 in
             -r|--recursive)
                 recursive=1
                 shift
+                ;;
+            -f|--format)
+                FORMAT=$2
+                shift 2
                 ;;
             *)
                 if [[ -z "$input_path" ]]; then
@@ -302,29 +287,73 @@ main() {
                 ;;
         esac
     done
-    
+
+    # Validate format
+    if [[ "$FORMAT" != "pdf" ]] && [[ "$FORMAT" != "docx" ]]; then
+        print_color "$RED" "ERROR: Invalid format '$FORMAT'. Must be 'pdf' or 'docx'."
+        exit 1
+    fi
+
+    # Check Pandoc (required for all formats)
+    if ! command_exists pandoc; then
+        print_color "$RED" "ERROR: pandoc is not installed or not in PATH"
+        print_color "$YELLOW" "Please install pandoc: https://pandoc.org/installing.html"
+        exit 1
+    fi
+
+    local pandoc_version
+    pandoc_version=$(pandoc --version | head -n1 | cut -d' ' -f2)
+
+    # Typst and pandoc 3.2+ are only required for PDF output
+    if [[ "$FORMAT" == "pdf" ]]; then
+        local pandoc_major pandoc_minor
+        pandoc_major=$(echo "$pandoc_version" | cut -d'.' -f1)
+        pandoc_minor=$(echo "$pandoc_version" | cut -d'.' -f2)
+        if [[ $pandoc_major -lt 3 ]] || { [[ $pandoc_major -eq 3 ]] && [[ $pandoc_minor -lt 2 ]]; }; then
+            print_color "$RED" "ERROR: pandoc $pandoc_version is too old. Version 3.2 or higher is required for PDF output."
+            print_color "$YELLOW" "Please upgrade pandoc from: https://pandoc.org/installing.html"
+            exit 1
+        fi
+
+        if ! command_exists typst; then
+            print_color "$RED" "ERROR: Typst is not installed or not in PATH"
+            echo ""
+            print_color "$YELLOW" "To install Typst, run:"
+            print_color "$CYAN" "  $0 --install"
+            echo ""
+            print_color "$YELLOW" "Or install manually from: https://github.com/typst/typst/releases"
+            exit 1
+        fi
+
+        local typst_version
+        typst_version=$(typst --version | cut -d' ' -f2)
+        print_color "$CYAN" "Using pandoc $pandoc_version with Typst $typst_version (format: pdf)"
+    else
+        print_color "$CYAN" "Using pandoc $pandoc_version (format: docx)"
+    fi
+    echo ""
+
     # Validate input path
     if [[ -z "$input_path" ]]; then
         print_color "$RED" "ERROR: No input path specified"
         echo ""
         show_usage
     fi
-    
+
     if [[ ! -e "$input_path" ]]; then
         print_color "$RED" "ERROR: Input path not found: $input_path"
         exit 1
     fi
-    
+
     # Create output directory
     mkdir -p "$OUTPUT_DIR"
     print_color "$GREEN" "Output directory: $OUTPUT_DIR"
     echo ""
-    
+
     # Find markdown files
     local md_files=()
-    
+
     if [[ -f "$input_path" ]]; then
-        # Single file
         if [[ "$input_path" == *.md ]]; then
             md_files=("$input_path")
         else
@@ -332,9 +361,8 @@ main() {
             exit 1
         fi
     elif [[ -d "$input_path" ]]; then
-        # Directory
         print_color "$CYAN" "Searching for markdown files in: $input_path"
-        
+
         if [[ $recursive -eq 1 ]]; then
             while IFS= read -r -d '' file; do
                 md_files+=("$file")
@@ -345,30 +373,31 @@ main() {
             done < <(find "$input_path" -maxdepth 1 -type f -name "*.md" -print0)
         fi
     fi
-    
+
     if [[ ${#md_files[@]} -eq 0 ]]; then
         print_color "$YELLOW" "No markdown files found."
         exit 0
     fi
-    
+
     print_color "$CYAN" "Found ${#md_files[@]} markdown file(s)"
     echo ""
-    
+
     # Convert files
     local success_count=0
     local fail_count=0
-    
+
     for md_file in "${md_files[@]}"; do
-        local base_name=$(basename "$md_file" .md)
-        local pdf_file="${OUTPUT_DIR}/${base_name}.pdf"
-        
-        if convert_md_to_pdf "$md_file" "$pdf_file"; then
+        local base_name
+        base_name=$(basename "$md_file" .md)
+        local output_file="${OUTPUT_DIR}/${base_name}.${FORMAT}"
+
+        if convert_file "$md_file" "$output_file" "$FORMAT"; then
             success_count=$((success_count + 1))
         else
             fail_count=$((fail_count + 1))
         fi
     done
-    
+
     # Summary
     echo ""
     print_color "$YELLOW" "=== Conversion Complete ==="

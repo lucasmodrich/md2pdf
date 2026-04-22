@@ -1,12 +1,12 @@
 # md2pdf
 
-Convert Markdown files to beautifully formatted PDFs with GitHub-style styling using the Typst typesetting engine.
+Convert Markdown files to beautifully formatted PDFs or editable Word documents (DOCX) using Pandoc and the Typst typesetting engine.
 
 ## Overview
 
-`md2pdf` provides cross-platform scripts for converting Markdown documents to PDF format. The scripts use [Pandoc](https://pandoc.org/) for Markdown parsing and [Typst](https://typst.app/) as the PDF rendering engine, producing clean, professional PDFs with GitHub-inspired formatting.
+`md2pdf` provides cross-platform scripts for converting Markdown documents to PDF or DOCX format. The scripts use [Pandoc](https://pandoc.org/) for Markdown parsing, with [Typst](https://typst.app/) as the PDF rendering engine for GitHub-inspired PDF output. DOCX output is handled directly by Pandoc and does not require Typst.
 
-### Why Typst?
+### Why Typst (for PDF)?
 
 - ✓ Native Unicode and emoji support (✓ ✗ 😀 🎉)
 - ✓ Modern typography and layout capabilities
@@ -17,6 +17,7 @@ Convert Markdown files to beautifully formatted PDFs with GitHub-style styling u
 ## Features
 
 - **Cross-platform**: Works on Windows (PowerShell), Linux, and macOS (Bash), including ARM64
+- **Multiple output formats**: Export to PDF (GitHub-styled) or DOCX (editable Word document)
 - **Batch conversion**: Process entire directories of Markdown files
 - **Recursive processing**: Scan subdirectories for Markdown files
 - **GitHub styling**: Professional, GitHub-themed PDF output
@@ -27,16 +28,21 @@ Convert Markdown files to beautifully formatted PDFs with GitHub-style styling u
 
 ## Dependencies
 
-### Required
+### PDF output
 
 1. **Pandoc** (v3.2 or higher)
    - Universal document converter
-   - Required for Markdown to Typst conversion
    - v3.2+ is required for Typst output format support
 
 2. **Typst** (v0.12.0 recommended)
    - Modern typesetting engine
    - Can be auto-installed by the scripts
+
+### DOCX output
+
+1. **Pandoc** (any recent version)
+   - Handles Markdown to DOCX conversion directly
+   - Typst is **not** required
 
 ### Optional
 
@@ -136,9 +142,14 @@ cd md2pdf
 
 ### Windows (PowerShell)
 
-#### Convert a single file
+#### Convert a single file to PDF
 ```powershell
 .\md2pdf.ps1 -InputPath "README.md"
+```
+
+#### Convert a single file to DOCX
+```powershell
+.\md2pdf.ps1 -InputPath "README.md" -Format docx
 ```
 
 #### Convert all Markdown files in a directory
@@ -151,7 +162,12 @@ cd md2pdf
 .\md2pdf.ps1 -InputPath "./docs" -OutputDir "./output" -Recursive
 ```
 
-#### Check if Typst is installed
+#### Convert recursively to DOCX
+```powershell
+.\md2pdf.ps1 -InputPath "./docs" -Format docx -Recursive
+```
+
+#### Install Typst (required for PDF output)
 ```powershell
 .\md2pdf.ps1 -InstallTypst
 ```
@@ -163,9 +179,14 @@ cd md2pdf
 chmod +x md2pdf.sh
 ```
 
-#### Convert a single file
+#### Convert a single file to PDF
 ```bash
 ./md2pdf.sh README.md
+```
+
+#### Convert a single file to DOCX
+```bash
+./md2pdf.sh README.md --format docx
 ```
 
 #### Convert all Markdown files in a directory
@@ -178,7 +199,12 @@ chmod +x md2pdf.sh
 ./md2pdf.sh ./docs ./output --recursive
 ```
 
-#### Install Typst
+#### Convert recursively to DOCX
+```bash
+./md2pdf.sh ./docs ./output --format docx --recursive
+```
+
+#### Install Typst (required for PDF output)
 ```bash
 ./md2pdf.sh --install
 ```
@@ -195,7 +221,8 @@ chmod +x md2pdf.sh
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `-InputPath` | String | Yes* | - | Path to a Markdown file or directory |
-| `-OutputDir` | String | No | `./output` | Directory for PDF output |
+| `-OutputDir` | String | No | `./output` | Directory for output files |
+| `-Format` | String | No | `pdf` | Output format: `pdf` or `docx` |
 | `-Recursive` | Switch | No | `false` | Process subdirectories recursively |
 | `-InstallTypst` | Switch | No | `false` | Download and install Typst |
 
@@ -206,7 +233,8 @@ chmod +x md2pdf.sh
 | Option | Type | Required | Default | Description |
 |--------|------|----------|---------|-------------|
 | `<input_path>` | Positional | Yes* | - | Path to a Markdown file or directory |
-| `[output_dir]` | Positional | No | `./output` | Directory for PDF output |
+| `[output_dir]` | Positional | No | `./output` | Directory for output files |
+| `-f, --format` | Flag | No | `pdf` | Output format: `pdf` or `docx` |
 | `-r, --recursive` | Flag | No | `false` | Process subdirectories recursively |
 | `-i, --install` | Flag | No | `false` | Download and install Typst |
 | `-h, --help` | Flag | No | `false` | Show help message |
@@ -215,7 +243,9 @@ chmod +x md2pdf.sh
 
 ## Output Format
 
-The scripts generate PDFs with GitHub-style formatting:
+### PDF
+
+PDFs are rendered with GitHub-style formatting via Typst:
 
 - **Typography**: Cross-platform font priority list — `Segoe UI` / `Arial` / `Helvetica` / `DejaVu Sans`
 - **Monospace**: `Consolas` / `Menlo` / `DejaVu Sans Mono` / `Courier New`
@@ -226,9 +256,13 @@ The scripts generate PDFs with GitHub-style formatting:
 - **Quotes**: Left border with grey text
 - **Page margins**: 2.5cm on all sides
 
+### DOCX
+
+DOCX files are produced directly by Pandoc using its default Word styles. The output is clean and fully editable in Microsoft Word or any compatible application. YAML front matter (`title`, `author`, `date`) is preserved as document metadata.
+
 ## Examples
 
-### Example 1: Convert documentation directory
+### Example 1: Convert documentation directory to PDF
 ```powershell
 # Windows
 .\md2pdf.ps1 -InputPath "./docs" -Recursive
@@ -237,7 +271,16 @@ The scripts generate PDFs with GitHub-style formatting:
 ./md2pdf.sh -r ./docs
 ```
 
-### Example 2: Convert to specific output location
+### Example 2: Convert documentation directory to DOCX
+```powershell
+# Windows
+.\md2pdf.ps1 -InputPath "./docs" -Format docx -Recursive
+
+# Linux/macOS
+./md2pdf.sh ./docs --format docx --recursive
+```
+
+### Example 3: Convert to specific output location
 ```powershell
 # Windows
 .\md2pdf.ps1 -InputPath "project-notes.md" -OutputDir "C:\exports"
@@ -246,13 +289,18 @@ The scripts generate PDFs with GitHub-style formatting:
 ./md2pdf.sh project-notes.md ~/exports
 ```
 
-### Example 3: Batch convert with custom styling
-The scripts automatically apply GitHub styling. Output PDFs will be saved to `./output` by default:
+### Example 4: Batch convert — output layout
+Output files are saved to `./output` by default with the appropriate extension:
 ```
 output/
-├── README.pdf
+├── README.pdf          # --format pdf (default)
 ├── CONTRIBUTING.pdf
 └── CHANGELOG.pdf
+
+output/
+├── README.docx         # --format docx
+├── CONTRIBUTING.docx
+└── CHANGELOG.docx
 ```
 
 ## Troubleshooting

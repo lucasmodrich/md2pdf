@@ -1,31 +1,43 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Convert markdown files to PDF using Typst engine with GitHub styling.
+    Convert markdown files to PDF or DOCX.
 
 .DESCRIPTION
-    This script converts one or more markdown files to PDF format using pandoc with Typst as the PDF engine.
-    Typst provides excellent Unicode support, modern typography, and fast compilation.
+    Converts one or more markdown files to PDF (via Pandoc + Typst with GitHub styling)
+    or DOCX (via Pandoc directly). PDF output requires both Pandoc (v3.2+) and Typst.
+    DOCX output requires only Pandoc.
 
 .PARAMETER InputPath
     Path to a markdown file or directory containing markdown files.
 
 .PARAMETER OutputDir
-    Directory where PDF files will be saved. Defaults to './output'.
+    Directory where output files will be saved. Defaults to './output'.
+
+.PARAMETER Format
+    Output format: 'pdf' (default) or 'docx'.
 
 .PARAMETER Recursive
     If specified and InputPath is a directory, process markdown files in subdirectories.
 
 .PARAMETER InstallTypst
-    If specified, downloads and installs Typst if not already installed.
+    If specified, downloads and installs Typst if not already installed (PDF only).
 
 .EXAMPLE
     .\md2pdf.ps1 -InputPath "README.md"
     Convert a single markdown file to PDF.
 
 .EXAMPLE
+    .\md2pdf.ps1 -InputPath "README.md" -Format docx
+    Convert a single markdown file to DOCX.
+
+.EXAMPLE
     .\md2pdf.ps1 -InputPath "./docs" -Recursive
-    Convert all markdown files in the docs directory and subdirectories.
+    Convert all markdown files in the docs directory and subdirectories to PDF.
+
+.EXAMPLE
+    .\md2pdf.ps1 -InputPath "./docs" -Format docx -Recursive
+    Convert all markdown files in the docs directory and subdirectories to DOCX.
 
 .EXAMPLE
     .\md2pdf.ps1 -InstallTypst
@@ -36,13 +48,17 @@
 param(
     [Parameter(Mandatory=$false, Position=0)]
     [string]$InputPath,
-    
+
     [Parameter(Mandatory=$false)]
     [string]$OutputDir = "./output",
-    
+
+    [Parameter(Mandatory=$false)]
+    [ValidateSet('pdf', 'docx')]
+    [string]$Format = "pdf",
+
     [Parameter(Mandatory=$false)]
     [switch]$Recursive,
-    
+
     [Parameter(Mandatory=$false)]
     [switch]$InstallTypst
 )
@@ -111,32 +127,53 @@ function Install-Typst {
     }
 }
 
-# Function to convert a single markdown file to PDF using Typst
-function Convert-MarkdownToPdf {
+# Convert a single markdown file to PDF (via Typst) or DOCX (via Pandoc directly)
+function Convert-MarkdownFile {
     param(
         [string]$MarkdownFile,
-        [string]$OutputFile
+        [string]$OutputFile,
+        [string]$OutputFormat
     )
-    
+
     Write-Host "Converting: $MarkdownFile" -ForegroundColor Cyan
-    
-    # Build pandoc command - generate Typst first, then compile
+
+    if ($OutputFormat -eq 'docx') {
+        try {
+            $pandocOutput = & pandoc $MarkdownFile -o $OutputFile 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "✓ Created: $OutputFile" -ForegroundColor Green
+                return $true
+            }
+            else {
+                Write-Host "✗ Failed to convert: $MarkdownFile" -ForegroundColor Red
+                if ($pandocOutput) { Write-Host ($pandocOutput -join "`n") -ForegroundColor Red }
+                return $false
+            }
+        }
+        catch {
+            Write-Host "✗ Failed to convert: $MarkdownFile" -ForegroundColor Red
+            Write-Host "  Error: $_" -ForegroundColor Red
+            return $false
+        }
+    }
+
+    # PDF path: Markdown → Typst (with GitHub styling) → PDF
     # Place the .typ file next to the source markdown so Typst resolves relative
     # paths (images, includes) against the correct directory.
     $typstBaseName = [System.IO.Path]::GetFileNameWithoutExtension($OutputFile)
     $sourceDir = Split-Path $MarkdownFile -Parent
     $typstFile = Join-Path $sourceDir "._md2pdf_$typstBaseName.typ"
-    
+
     try {
         # Step 1: Convert markdown to Typst (--standalone preserves YAML front matter)
         $pandocOutput = & pandoc $MarkdownFile -o $typstFile -t typst --standalone 2>&1
-        
+
         if ($LASTEXITCODE -ne 0) {
             Write-Host "✗ Failed to convert markdown to Typst: $MarkdownFile" -ForegroundColor Red
             if ($pandocOutput) { Write-Host ($pandocOutput -join "`n") -ForegroundColor Red }
             return $false
         }
-        
+
         # Step 2: Add GitHub styling to the Typst file
         $typstContent = Get-Content $typstFile -Raw
         $styledTypst = @"
@@ -189,14 +226,13 @@ function Convert-MarkdownToPdf {
 
 $typstContent
 "@
-        
+
         Set-Content -Path $typstFile -Value $styledTypst -Encoding UTF8
-        
+
         # Step 3: Compile Typst to PDF
         $typstOutput = & typst compile $typstFile $OutputFile 2>&1
-        
+
         if ($LASTEXITCODE -eq 0) {
-            # Clean up intermediate Typst file
             Remove-Item $typstFile -Force -ErrorAction SilentlyContinue
             Write-Host "✓ Created: $OutputFile" -ForegroundColor Green
             return $true
@@ -216,7 +252,7 @@ $typstContent
 }
 
 # Main script execution
-Write-Host "=== Markdown to PDF Converter (Typst Engine) ===" -ForegroundColor Yellow
+Write-Host "=== Markdown Converter ===" -ForegroundColor Yellow
 Write-Host ""
 
 # Handle InstallTypst flag
@@ -233,41 +269,45 @@ if ($InstallTypst) {
 if (-not $InputPath) {
     Write-Host "ERROR: InputPath parameter is required" -ForegroundColor Red
     Write-Host ""
-    Write-Host "Usage: .\md2pdf.ps1 -InputPath <path>" -ForegroundColor Yellow
-    Write-Host "Use -InstallTypst flag to install Typst first" -ForegroundColor Yellow
+    Write-Host "Usage: .\md2pdf.ps1 -InputPath <path> [-Format pdf|docx]" -ForegroundColor Yellow
+    Write-Host "Use -InstallTypst flag to install Typst first (required for PDF output)" -ForegroundColor Yellow
     exit 1
 }
 
-# Check if pandoc is installed
+# Check Pandoc (required for all formats)
 if (-not (Test-CommandExists "pandoc")) {
     Write-Host "ERROR: pandoc is not installed or not in PATH" -ForegroundColor Red
     Write-Host "Please install pandoc from: https://pandoc.org/installing.html" -ForegroundColor Yellow
     exit 1
 }
 
-# Check minimum pandoc version (3.2 introduced -t typst)
 $pandocVersionRaw = (pandoc --version | Select-Object -First 1) -replace "pandoc ", ""
-$pandocVersionParsed = [version]($pandocVersionRaw -replace "-.*", "")
-if ($pandocVersionParsed -lt [version]"3.2") {
-    Write-Host "ERROR: pandoc $pandocVersionRaw is too old. Version 3.2 or higher is required for Typst output." -ForegroundColor Red
-    Write-Host "Please upgrade pandoc from: https://pandoc.org/installing.html" -ForegroundColor Yellow
-    exit 1
-}
 
-# Check if Typst is installed
-if (-not (Test-CommandExists "typst")) {
-    Write-Host "ERROR: Typst is not installed or not in PATH" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "To install Typst, run:" -ForegroundColor Yellow
-    Write-Host "  .\md2pdf.ps1 -InstallTypst" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "Or install manually from: https://github.com/typst/typst/releases" -ForegroundColor Yellow
-    exit 1
-}
+# Typst and pandoc 3.2+ are only required for PDF output
+if ($Format -eq 'pdf') {
+    $pandocVersionParsed = [version]($pandocVersionRaw -replace "-.*", "")
+    if ($pandocVersionParsed -lt [version]"3.2") {
+        Write-Host "ERROR: pandoc $pandocVersionRaw is too old. Version 3.2 or higher is required for PDF output." -ForegroundColor Red
+        Write-Host "Please upgrade pandoc from: https://pandoc.org/installing.html" -ForegroundColor Yellow
+        exit 1
+    }
 
-# Show versions
-$typstVersionFull = (typst --version) -replace "typst ", "" -replace " \(.*\)", ""
-Write-Host "Using pandoc $pandocVersionRaw with Typst $typstVersionFull" -ForegroundColor Cyan
+    if (-not (Test-CommandExists "typst")) {
+        Write-Host "ERROR: Typst is not installed or not in PATH" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "To install Typst, run:" -ForegroundColor Yellow
+        Write-Host "  .\md2pdf.ps1 -InstallTypst" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Or install manually from: https://github.com/typst/typst/releases" -ForegroundColor Yellow
+        exit 1
+    }
+
+    $typstVersionFull = (typst --version) -replace "typst ", "" -replace " \(.*\)", ""
+    Write-Host "Using pandoc $pandocVersionRaw with Typst $typstVersionFull (format: pdf)" -ForegroundColor Cyan
+}
+else {
+    Write-Host "Using pandoc $pandocVersionRaw (format: docx)" -ForegroundColor Cyan
+}
 Write-Host ""
 
 # Create output directory if it doesn't exist
@@ -280,9 +320,8 @@ if (-not (Test-Path $OutputDir)) {
 $markdownFiles = @()
 
 if (Test-Path $InputPath -PathType Container) {
-    # Directory input
     Write-Host "Searching for markdown files in: $InputPath" -ForegroundColor Cyan
-    
+
     if ($Recursive) {
         $markdownFiles = Get-ChildItem -Path $InputPath -Filter "*.md" -Recurse -File
     }
@@ -291,7 +330,6 @@ if (Test-Path $InputPath -PathType Container) {
     }
 }
 elseif (Test-Path $InputPath -PathType Leaf) {
-    # Single file input
     if ($InputPath -match '\.md$') {
         $markdownFiles = @(Get-Item $InputPath)
     }
@@ -318,12 +356,10 @@ $successCount = 0
 $failCount = 0
 
 foreach ($mdFile in $markdownFiles) {
-    # Generate output filename
-    $pdfFileName = [System.IO.Path]::GetFileNameWithoutExtension($mdFile.Name) + ".pdf"
-    $pdfPath = Join-Path $OutputDir $pdfFileName
-    
-    # Convert
-    if (Convert-MarkdownToPdf -MarkdownFile $mdFile.FullName -OutputFile $pdfPath) {
+    $outputFileName = [System.IO.Path]::GetFileNameWithoutExtension($mdFile.Name) + ".$Format"
+    $outputPath = Join-Path $OutputDir $outputFileName
+
+    if (Convert-MarkdownFile -MarkdownFile $mdFile.FullName -OutputFile $outputPath -OutputFormat $Format) {
         $successCount++
     }
     else {
